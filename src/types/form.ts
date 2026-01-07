@@ -19,6 +19,9 @@ export interface FieldOption {
   value: string;
 }
 
+export type FieldWidth = 'full' | 'half' | 'third' | 'quarter';
+export type FieldPosition = 'left' | 'center' | 'right';
+
 export interface FormField {
   id: string;
   type: FieldType;
@@ -34,6 +37,8 @@ export interface FormField {
     max?: number;
   };
   pageNumber: number;
+  width?: FieldWidth;
+  position?: FieldPosition;
 }
 
 export interface Form {
