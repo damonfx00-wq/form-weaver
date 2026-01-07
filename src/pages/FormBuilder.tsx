@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useFormContext } from '@/contexts/FormContext';
-import { FormField, FieldType } from '@/types/form';
+import { FormField, FieldType, FieldWidth, FieldPosition } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -335,66 +335,88 @@ const FormBuilder: React.FC = () => {
                 )}
 
                 <div className="space-y-4">
-                  {currentForm?.fields.map((field, index) => (
-                    <div
-                      key={field.id}
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragEnd={handleDragEnd}
-                      onClick={() => setSelectedField(field)}
-                      className={cn(
-                        "p-4 rounded-xl border-2 cursor-pointer transition-all group",
-                        selectedField?.id === field.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50",
-                        draggedIndex === index && "opacity-50"
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        <button className="mt-1 p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
-                          <GripVertical className="w-4 h-4" />
-                        </button>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Label className="text-sm font-medium">
-                              {field.label}
-                              {field.required && <span className="text-destructive ml-1">*</span>}
-                            </Label>
+                  {currentForm?.fields.map((field, index) => {
+                    const widthClass = {
+                      full: 'w-full',
+                      half: 'w-1/2',
+                      third: 'w-1/3',
+                      quarter: 'w-1/4',
+                    }[field.width || 'full'];
+                    
+                    const positionClass = {
+                      left: 'mr-auto',
+                      center: 'mx-auto',
+                      right: 'ml-auto',
+                    }[field.position || 'left'];
+
+                    return (
+                      <div
+                        key={field.id}
+                        className={cn(widthClass, positionClass)}
+                      >
+                        <div
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDragEnd={handleDragEnd}
+                          onClick={() => setSelectedField(field)}
+                          className={cn(
+                            "p-4 rounded-xl border-2 cursor-pointer transition-all group",
+                            selectedField?.id === field.id
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50",
+                            draggedIndex === index && "opacity-50"
+                          )}
+                        >
+                          <div className="flex items-start gap-3">
+                            <button className="mt-1 p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+                              <GripVertical className="w-4 h-4" />
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Label className="text-sm font-medium">
+                                  {field.label}
+                                  {field.required && <span className="text-destructive ml-1">*</span>}
+                                </Label>
+                                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                  {field.width === 'half' ? '50%' : field.width === 'third' ? '33%' : field.width === 'quarter' ? '25%' : '100%'}
+                                </span>
+                              </div>
+                              {renderFieldPreview(field)}
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newField = { ...field, id: `field_${Date.now()}` };
+                                  addField(newField);
+                                }}
+                              >
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeField(field.id);
+                                  if (selectedField?.id === field.id) {
+                                    setSelectedField(null);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          {renderFieldPreview(field)}
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const newField = { ...field, id: `field_${Date.now()}` };
-                              addField(newField);
-                            }}
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeField(field.id);
-                              if (selectedField?.id === field.id) {
-                                setSelectedField(null);
-                              }
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </CardContent>
@@ -442,6 +464,50 @@ const FormBuilder: React.FC = () => {
                       onCheckedChange={(checked) => updateField(selectedField.id, { required: checked })}
                     />
                   </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Field Width</Label>
+                    <div className="grid grid-cols-4 gap-1">
+                      {(['full', 'half', 'third', 'quarter'] as FieldWidth[]).map((w) => (
+                        <button
+                          key={w}
+                          onClick={() => updateField(selectedField.id, { width: w })}
+                          className={cn(
+                            "px-2 py-1.5 text-xs rounded-md border transition-colors capitalize",
+                            (selectedField.width || 'full') === w
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-border hover:bg-accent"
+                          )}
+                        >
+                          {w === 'full' ? '100%' : w === 'half' ? '50%' : w === 'third' ? '33%' : '25%'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Position</Label>
+                    <div className="grid grid-cols-3 gap-1">
+                      {(['left', 'center', 'right'] as FieldPosition[]).map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => updateField(selectedField.id, { position: p })}
+                          className={cn(
+                            "px-2 py-1.5 text-xs rounded-md border transition-colors capitalize",
+                            (selectedField.position || 'left') === p
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-border hover:bg-accent"
+                          )}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Separator />
 
                   {['dropdown', 'radio', 'checkbox'].includes(selectedField.type) && (
                     <div className="space-y-2">
