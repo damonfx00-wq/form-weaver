@@ -17,6 +17,13 @@ import {
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import {
   User,
   Mail,
   Phone,
@@ -38,9 +45,12 @@ import {
   Settings2,
   Plus,
   X,
+  Menu,
+  PanelRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface FieldComponentConfig {
   type: FieldType;
@@ -70,12 +80,15 @@ const FormBuilder: React.FC = () => {
   const navigate = useNavigate();
   const { currentForm, setCurrentForm, getFormById, createForm, updateForm, addField, updateField, removeField, reorderFields } = useFormContext();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showFieldsPanel, setShowFieldsPanel] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
   // Get the selected field from the current form (keeps it in sync)
   const selectedField = currentForm?.fields.find(f => f.id === selectedFieldId) || null;
@@ -87,6 +100,7 @@ const FormBuilder: React.FC = () => {
   
   // Get fields for current page
   const currentPageFields = currentForm?.fields.filter(f => f.pageNumber === currentPage) || [];
+
 
   useEffect(() => {
     if (id && id !== 'new') {
@@ -238,96 +252,281 @@ const FormBuilder: React.FC = () => {
   const basicFields = fieldComponents.filter(f => f.category === 'basic');
   const advancedFields = fieldComponents.filter(f => f.category === 'advanced');
 
+  // Render fields panel content (reusable for both desktop and mobile)
+  const renderFieldsPanelContent = () => (
+    <div className="space-y-4">
+      <div>
+        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Basic Fields</p>
+        <div className="space-y-1">
+          {basicFields.map(field => (
+            <button
+              key={field.type}
+              onClick={() => {
+                handleAddField(field.type);
+                if (isMobile) setShowFieldsPanel(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-left group"
+            >
+              <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                <field.icon className="w-4 h-4 text-primary" />
+              </div>
+              <span className="text-sm font-medium">{field.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div>
+        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Advanced Fields</p>
+        <div className="space-y-1">
+          {advancedFields.map(field => (
+            <button
+              key={field.type}
+              onClick={() => {
+                handleAddField(field.type);
+                if (isMobile) setShowFieldsPanel(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-left group"
+            >
+              <div className="w-8 h-8 rounded-md bg-accent/50 flex items-center justify-center group-hover:bg-accent transition-colors">
+                <field.icon className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <span className="text-sm font-medium">{field.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render settings panel content (reusable for both desktop and mobile)
+  const renderSettingsPanelContent = () => (
+    <>
+      {selectedField ? (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-xs">Field Label</Label>
+            <Input
+              value={selectedField.label}
+              onChange={(e) => updateField(selectedField.id, { label: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Placeholder</Label>
+            <Input
+              value={selectedField.placeholder || ''}
+              onChange={(e) => updateField(selectedField.id, { placeholder: e.target.value })}
+              placeholder="Enter placeholder text..."
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Required</Label>
+            <Switch
+              checked={selectedField.required}
+              onCheckedChange={(checked) => updateField(selectedField.id, { required: checked })}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label className="text-xs">Field Width</Label>
+            <div className="grid grid-cols-4 gap-1">
+              {(['full', 'half', 'third', 'quarter'] as FieldWidth[]).map((w) => (
+                <button
+                  key={w}
+                  onClick={() => updateField(selectedField.id, { width: w })}
+                  className={cn(
+                    "px-2 py-1.5 text-xs rounded-md border transition-colors capitalize",
+                    (selectedField.width || 'full') === w
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-accent"
+                  )}
+                >
+                  {w === 'full' ? '100%' : w === 'half' ? '50%' : w === 'third' ? '33%' : '25%'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Position</Label>
+            <div className="grid grid-cols-3 gap-1">
+              {(['left', 'center', 'right'] as FieldPosition[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => updateField(selectedField.id, { position: p })}
+                  className={cn(
+                    "px-2 py-1.5 text-xs rounded-md border transition-colors capitalize",
+                    (selectedField.position || 'left') === p
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-accent"
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {['dropdown', 'radio', 'checkbox'].includes(selectedField.type) && (
+            <div className="space-y-2">
+              <Label className="text-xs">Options</Label>
+              <div className="space-y-2">
+                {selectedField.options?.map((option, idx) => (
+                  <div key={option.id} className="flex items-center gap-2">
+                    <Input
+                      value={option.label}
+                      onChange={(e) => {
+                        const newOptions = [...(selectedField.options || [])];
+                        newOptions[idx] = { ...option, label: e.target.value, value: e.target.value.toLowerCase().replace(/\s+/g, '_') };
+                        updateField(selectedField.id, { options: newOptions });
+                      }}
+                      className="h-8 text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => {
+                        const newOptions = selectedField.options?.filter((_, i) => i !== idx);
+                        updateField(selectedField.id, { options: newOptions });
+                      }}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    const newOption = {
+                      id: `opt_${Date.now()}`,
+                      label: `Option ${(selectedField.options?.length || 0) + 1}`,
+                      value: `option_${(selectedField.options?.length || 0) + 1}`,
+                    };
+                    updateField(selectedField.id, {
+                      options: [...(selectedField.options || []), newOption],
+                    });
+                  }}
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Option
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          <Settings2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">Select a field to edit its settings</p>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <DashboardLayout>
       <div className="flex flex-col h-[calc(100vh-8rem)] animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4">
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Back</span>
             </Button>
-            <Separator orientation="vertical" className="h-6" />
-            <div>
+            <Separator orientation="vertical" className="h-6 hidden sm:block" />
+            <div className="flex-1 sm:flex-none">
               <Input
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
                 placeholder="Untitled Form"
-                className="text-xl font-display font-bold border-none bg-transparent px-0 h-auto focus-visible:ring-0"
+                className="text-lg sm:text-xl font-display font-bold border-none bg-transparent px-0 h-auto focus-visible:ring-0"
               />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handlePreview} disabled={!currentForm}>
-              <Eye className="w-4 h-4 mr-2" />
-              Preview
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Mobile: Add Fields Button */}
+            {isMobile && (
+              <Sheet open={showFieldsPanel} onOpenChange={setShowFieldsPanel}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+                    <Menu className="w-4 h-4 mr-2" />
+                    Add Fields
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[280px] overflow-auto">
+                  <SheetHeader>
+                    <SheetTitle>Form Fields</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4">
+                    {renderFieldsPanelContent()}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+            <Button variant="outline" size="sm" onClick={handlePreview} disabled={!currentForm} className="flex-1 sm:flex-none">
+              <Eye className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Preview</span>
             </Button>
-            <Button onClick={handleSave} disabled={!formTitle.trim()}>
-              <Save className="w-4 h-4 mr-2" />
-              Save
+            <Button size="sm" onClick={handleSave} disabled={!formTitle.trim()} className="flex-1 sm:flex-none">
+              <Save className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Save</span>
             </Button>
+            {/* Mobile: Settings Button */}
+            {isMobile && selectedField && (
+              <Sheet open={showSettingsPanel} onOpenChange={setShowSettingsPanel}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <PanelRight className="w-4 h-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[280px] overflow-auto">
+                  <SheetHeader>
+                    <SheetTitle>Field Settings</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4">
+                    {renderSettingsPanelContent()}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
           </div>
         </div>
 
         {/* Builder Area */}
         <div className="flex flex-1 gap-4 overflow-hidden">
-          {/* Left Panel - Components */}
-          <Card className="w-64 shrink-0 overflow-auto">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Form Fields</CardTitle>
-              <CardDescription className="text-xs">
-                Click to add fields to your form
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Basic Fields</p>
-                <div className="space-y-1">
-                  {basicFields.map(field => (
-                    <button
-                      key={field.type}
-                      onClick={() => handleAddField(field.type)}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-left group"
-                    >
-                      <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                        <field.icon className="w-4 h-4 text-primary" />
-                      </div>
-                      <span className="text-sm font-medium">{field.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Advanced Fields</p>
-                <div className="space-y-1">
-                  {advancedFields.map(field => (
-                    <button
-                      key={field.type}
-                      onClick={() => handleAddField(field.type)}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-left group"
-                    >
-                      <div className="w-8 h-8 rounded-md bg-accent/50 flex items-center justify-center group-hover:bg-accent transition-colors">
-                        <field.icon className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <span className="text-sm font-medium">{field.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Left Panel - Components (Desktop only) */}
+          {!isMobile && (
+            <Card className="w-64 shrink-0 overflow-auto">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Form Fields</CardTitle>
+                <CardDescription className="text-xs">
+                  Click to add fields to your form
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {renderFieldsPanelContent()}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Center - Form Preview */}
           <Card className="flex-1 overflow-auto">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="max-w-lg mx-auto">
                 {/* Form Header */}
-                <div className="mb-8 text-center">
-                  <h2 className="text-2xl font-display font-bold mb-2">
+                <div className="mb-6 sm:mb-8 text-center">
+                  <h2 className="text-xl sm:text-2xl font-display font-bold mb-2">
                     {formTitle || 'Your Form Title'}
                   </h2>
                   <Textarea
@@ -339,11 +538,11 @@ const FormBuilder: React.FC = () => {
                 </div>
 
                 {/* Page Navigation */}
-                <div className="flex items-center justify-between mb-4 p-3 bg-muted/50 rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">Page {currentPage} of {totalPages}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -360,7 +559,7 @@ const FormBuilder: React.FC = () => {
                     >
                       <ArrowLeft className="w-4 h-4 rotate-180" />
                     </Button>
-                    <Separator orientation="vertical" className="h-6" />
+                    <Separator orientation="vertical" className="h-6 hidden sm:block" />
                     <Button
                       variant="outline"
                       size="sm"
@@ -373,8 +572,8 @@ const FormBuilder: React.FC = () => {
                         });
                       }}
                     >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Page
+                      <Plus className="w-4 h-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Add Page</span>
                     </Button>
                     {totalPages > 1 && (
                       <Button
@@ -403,8 +602,8 @@ const FormBuilder: React.FC = () => {
                           });
                         }}
                       >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Remove Page
+                        <Trash2 className="w-4 h-4 sm:mr-1" />
+                        <span className="hidden sm:inline">Remove Page</span>
                       </Button>
                     )}
                   </div>
@@ -414,22 +613,23 @@ const FormBuilder: React.FC = () => {
                 {currentPageFields.length === 0 && (
                   <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
                     <Plus className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground">
-                      Click a field type from the left panel to add it to page {currentPage}
+                    <p className="text-muted-foreground text-sm sm:text-base">
+                      {isMobile ? "Tap 'Add Fields' to add fields to this page" : `Click a field type from the left panel to add it to page ${currentPage}`}
                     </p>
                   </div>
                 )}
 
                 <div className="space-y-4">
                   {currentPageFields.map((field, index) => {
-                    const widthClass = {
+                    // On mobile, always use full width
+                    const widthClass = isMobile ? 'w-full' : {
                       full: 'w-full',
                       half: 'w-1/2',
                       third: 'w-1/3',
                       quarter: 'w-1/4',
                     }[field.width || 'full'];
                     
-                    const positionClass = {
+                    const positionClass = isMobile ? '' : {
                       left: 'mr-auto',
                       center: 'mx-auto',
                       right: 'ml-auto',
@@ -441,23 +641,28 @@ const FormBuilder: React.FC = () => {
                         className={cn(widthClass, positionClass)}
                       >
                         <div
-                          draggable
-                          onDragStart={() => handleDragStart(index)}
-                          onDragOver={(e) => handleDragOver(e, index)}
-                          onDragEnd={handleDragEnd}
-                          onClick={() => setSelectedFieldId(field.id)}
+                          draggable={!isMobile}
+                          onDragStart={() => !isMobile && handleDragStart(index)}
+                          onDragOver={(e) => !isMobile && handleDragOver(e, index)}
+                          onDragEnd={() => !isMobile && handleDragEnd()}
+                          onClick={() => {
+                            setSelectedFieldId(field.id);
+                            if (isMobile) setShowSettingsPanel(true);
+                          }}
                           className={cn(
-                            "p-4 rounded-xl border-2 cursor-pointer transition-all group",
+                            "p-3 sm:p-4 rounded-xl border-2 cursor-pointer transition-all group",
                             selectedField?.id === field.id
                               ? "border-primary bg-primary/5"
                               : "border-border hover:border-primary/50",
                             draggedIndex === index && "opacity-50"
                           )}
                         >
-                          <div className="flex items-start gap-3">
-                            <button className="mt-1 p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
-                              <GripVertical className="w-4 h-4" />
-                            </button>
+                          <div className="flex items-start gap-2 sm:gap-3">
+                            {!isMobile && (
+                              <button className="mt-1 p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+                                <GripVertical className="w-4 h-4" />
+                              </button>
+                            )}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-2">
                                 <Label className="text-sm font-medium">
@@ -470,7 +675,10 @@ const FormBuilder: React.FC = () => {
                               </div>
                               {renderFieldPreview(field)}
                             </div>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className={cn(
+                              "flex items-center gap-1 transition-opacity",
+                              isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            )}>
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -508,151 +716,27 @@ const FormBuilder: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Right Panel - Field Settings */}
-          <Card className="w-72 shrink-0 overflow-auto">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Settings2 className="w-4 h-4" />
-                  Field Settings
-                </CardTitle>
-                {selectedField && (
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedFieldId(null)}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {selectedField ? (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Field Label</Label>
-                    <Input
-                      value={selectedField.label}
-                      onChange={(e) => updateField(selectedField.id, { label: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">Placeholder</Label>
-                    <Input
-                      value={selectedField.placeholder || ''}
-                      onChange={(e) => updateField(selectedField.id, { placeholder: e.target.value })}
-                      placeholder="Enter placeholder text..."
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Required</Label>
-                    <Switch
-                      checked={selectedField.required}
-                      onCheckedChange={(checked) => updateField(selectedField.id, { required: checked })}
-                    />
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">Field Width</Label>
-                    <div className="grid grid-cols-4 gap-1">
-                      {(['full', 'half', 'third', 'quarter'] as FieldWidth[]).map((w) => (
-                        <button
-                          key={w}
-                          onClick={() => updateField(selectedField.id, { width: w })}
-                          className={cn(
-                            "px-2 py-1.5 text-xs rounded-md border transition-colors capitalize",
-                            (selectedField.width || 'full') === w
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "border-border hover:bg-accent"
-                          )}
-                        >
-                          {w === 'full' ? '100%' : w === 'half' ? '50%' : w === 'third' ? '33%' : '25%'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">Position</Label>
-                    <div className="grid grid-cols-3 gap-1">
-                      {(['left', 'center', 'right'] as FieldPosition[]).map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => updateField(selectedField.id, { position: p })}
-                          className={cn(
-                            "px-2 py-1.5 text-xs rounded-md border transition-colors capitalize",
-                            (selectedField.position || 'left') === p
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "border-border hover:bg-accent"
-                          )}
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {['dropdown', 'radio', 'checkbox'].includes(selectedField.type) && (
-                    <div className="space-y-2">
-                      <Label className="text-xs">Options</Label>
-                      <div className="space-y-2">
-                        {selectedField.options?.map((option, idx) => (
-                          <div key={option.id} className="flex items-center gap-2">
-                            <Input
-                              value={option.label}
-                              onChange={(e) => {
-                                const newOptions = [...(selectedField.options || [])];
-                                newOptions[idx] = { ...option, label: e.target.value, value: e.target.value.toLowerCase().replace(/\s+/g, '_') };
-                                updateField(selectedField.id, { options: newOptions });
-                              }}
-                              className="h-8 text-sm"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0"
-                              onClick={() => {
-                                const newOptions = selectedField.options?.filter((_, i) => i !== idx);
-                                updateField(selectedField.id, { options: newOptions });
-                              }}
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        ))}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => {
-                            const newOption = {
-                              id: `opt_${Date.now()}`,
-                              label: `Option ${(selectedField.options?.length || 0) + 1}`,
-                              value: `option_${(selectedField.options?.length || 0) + 1}`,
-                            };
-                            updateField(selectedField.id, {
-                              options: [...(selectedField.options || []), newOption],
-                            });
-                          }}
-                        >
-                          <Plus className="w-3 h-3 mr-1" />
-                          Add Option
-                        </Button>
-                      </div>
-                    </div>
+          {/* Right Panel - Field Settings (Desktop only) */}
+          {!isMobile && (
+            <Card className="w-72 shrink-0 overflow-auto">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Settings2 className="w-4 h-4" />
+                    Field Settings
+                  </CardTitle>
+                  {selectedField && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedFieldId(null)}>
+                      <X className="w-4 h-4" />
+                    </Button>
                   )}
                 </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Settings2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Select a field to edit its settings</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent>
+                {renderSettingsPanelContent()}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </DashboardLayout>
