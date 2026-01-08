@@ -71,10 +71,22 @@ const FormBuilder: React.FC = () => {
   const { currentForm, setCurrentForm, getFormById, createForm, updateForm, addField, updateField, removeField, reorderFields } = useFormContext();
   const { toast } = useToast();
   
-  const [selectedField, setSelectedField] = useState<FormField | null>(null);
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Get the selected field from the current form (keeps it in sync)
+  const selectedField = currentForm?.fields.find(f => f.id === selectedFieldId) || null;
+  
+  // Calculate total pages
+  const totalPages = currentForm?.fields.length 
+    ? Math.max(...currentForm.fields.map(f => f.pageNumber), 1) 
+    : 1;
+  
+  // Get fields for current page
+  const currentPageFields = currentForm?.fields.filter(f => f.pageNumber === currentPage) || [];
 
   useEffect(() => {
     if (id && id !== 'new') {
@@ -124,8 +136,10 @@ const FormBuilder: React.FC = () => {
         : undefined,
     };
 
+    // Set page number based on current page
+    newField.pageNumber = currentPage;
     addField(newField);
-    setSelectedField(newField);
+    setSelectedFieldId(newField.id);
     
     toast({
       title: "Field added",
@@ -324,18 +338,90 @@ const FormBuilder: React.FC = () => {
                   />
                 </div>
 
+                {/* Page Navigation */}
+                <div className="flex items-center justify-between mb-4 p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Page {currentPage} of {totalPages}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ArrowLeft className="w-4 h-4 rotate-180" />
+                    </Button>
+                    <Separator orientation="vertical" className="h-6" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newPage = totalPages + 1;
+                        setCurrentPage(newPage);
+                        toast({
+                          title: "Page added",
+                          description: `Page ${newPage} has been created.`,
+                        });
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Page
+                    </Button>
+                    {totalPages > 1 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          if (currentPageFields.length > 0) {
+                            toast({
+                              title: "Cannot remove page",
+                              description: "Remove all fields from this page first.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          // Remove the empty page by moving all higher page fields down
+                          currentForm?.fields.forEach(field => {
+                            if (field.pageNumber > currentPage) {
+                              updateField(field.id, { pageNumber: field.pageNumber - 1 });
+                            }
+                          });
+                          setCurrentPage(p => Math.max(1, p - 1));
+                          toast({
+                            title: "Page removed",
+                            description: "The empty page has been deleted.",
+                          });
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Remove Page
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Fields */}
-                {currentForm?.fields.length === 0 && (
+                {currentPageFields.length === 0 && (
                   <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
                     <Plus className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground">
-                      Click a field type from the left panel to add it here
+                      Click a field type from the left panel to add it to page {currentPage}
                     </p>
                   </div>
                 )}
 
                 <div className="space-y-4">
-                  {currentForm?.fields.map((field, index) => {
+                  {currentPageFields.map((field, index) => {
                     const widthClass = {
                       full: 'w-full',
                       half: 'w-1/2',
@@ -359,7 +445,7 @@ const FormBuilder: React.FC = () => {
                           onDragStart={() => handleDragStart(index)}
                           onDragOver={(e) => handleDragOver(e, index)}
                           onDragEnd={handleDragEnd}
-                          onClick={() => setSelectedField(field)}
+                          onClick={() => setSelectedFieldId(field.id)}
                           className={cn(
                             "p-4 rounded-xl border-2 cursor-pointer transition-all group",
                             selectedField?.id === field.id
@@ -405,7 +491,7 @@ const FormBuilder: React.FC = () => {
                                   e.stopPropagation();
                                   removeField(field.id);
                                   if (selectedField?.id === field.id) {
-                                    setSelectedField(null);
+                                    setSelectedFieldId(null);
                                   }
                                 }}
                               >
@@ -431,7 +517,7 @@ const FormBuilder: React.FC = () => {
                   Field Settings
                 </CardTitle>
                 {selectedField && (
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedField(null)}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedFieldId(null)}>
                     <X className="w-4 h-4" />
                   </Button>
                 )}
